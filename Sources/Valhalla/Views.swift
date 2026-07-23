@@ -51,6 +51,8 @@ struct RootView: View {
         switch model.selectedSection {
         case .flash:
             FlashView()
+        case .unlock:
+            BootloaderView()
         case .device:
             DeviceView()
         case .logs:
@@ -82,13 +84,23 @@ struct SidebarView: View {
             }
             .padding(.horizontal, 13)
 
-            DeviceStatusCard()
-                .padding(.horizontal, 14)
-                .padding(.top, 26)
+            if model.selectedSection == .unlock {
+                UnlockSidebarStatus()
+                    .padding(.horizontal, 14)
+                    .padding(.top, 26)
 
-            SafetyRail()
-                .padding(.horizontal, 20)
-                .padding(.top, 24)
+                UnlockReadinessRail()
+                    .padding(.horizontal, 20)
+                    .padding(.top, 24)
+            } else {
+                DeviceStatusCard()
+                    .padding(.horizontal, 14)
+                    .padding(.top, 26)
+
+                SafetyRail()
+                    .padding(.horizontal, 20)
+                    .padding(.top, 24)
+            }
 
             Spacer(minLength: 18)
 
@@ -347,6 +359,7 @@ struct TopBar: View {
     private var sectionSubtitle: String {
         switch model.selectedSection {
         case .flash: return "Load official firmware packages and build a PIT-matched flash plan."
+        case .unlock: return "Inspect official unlock eligibility and guide the required on-device confirmation."
         case .device: return "Inspect the connected device’s authoritative partition layout."
         case .logs: return "A local audit trail of every backend action and result."
         }
@@ -1000,40 +1013,56 @@ private struct CardStyle: ViewModifier {
 }
 
 extension View {
-    fileprivate func cardStyle() -> some View {
+    func cardStyle() -> some View {
         modifier(CardStyle())
     }
 }
 
 struct PrimaryButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 11, weight: .semibold))
             .padding(.horizontal, 14)
             .frame(height: 33)
-            .background(Color(hex: 0x7967F2).opacity(configuration.isPressed ? 0.72 : 1), in: RoundedRectangle(cornerRadius: 8))
-            .foregroundStyle(.white)
+            .background(
+                Color(hex: 0x7967F2)
+                    .opacity(isEnabled ? (configuration.isPressed ? 0.72 : 1) : 0.15),
+                in: RoundedRectangle(cornerRadius: 8)
+            )
+            .foregroundStyle(isEnabled ? Color.white : Color.white.opacity(0.28))
     }
 }
 
 struct SecondaryButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 11, weight: .semibold))
             .padding(.horizontal, 13)
             .frame(height: 33)
-            .background(Color.white.opacity(configuration.isPressed ? 0.1 : 0.055), in: RoundedRectangle(cornerRadius: 8))
-            .foregroundStyle(Color.white.opacity(0.76))
+            .background(
+                Color.white.opacity(isEnabled ? (configuration.isPressed ? 0.1 : 0.055) : 0.025),
+                in: RoundedRectangle(cornerRadius: 8)
+            )
+            .foregroundStyle(Color.white.opacity(isEnabled ? 0.76 : 0.25))
     }
 }
 
 struct DangerButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 11, weight: .bold))
             .padding(.horizontal, 16)
             .frame(height: 35)
-            .background(Color.red.opacity(configuration.isPressed ? 0.65 : 0.83), in: RoundedRectangle(cornerRadius: 8))
-            .foregroundStyle(.white)
+            .background(
+                Color.red.opacity(isEnabled ? (configuration.isPressed ? 0.65 : 0.83) : 0.13),
+                in: RoundedRectangle(cornerRadius: 8)
+            )
+            .foregroundStyle(isEnabled ? Color.white : Color.white.opacity(0.27))
     }
 }

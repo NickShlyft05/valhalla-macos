@@ -16,8 +16,12 @@ struct ValhallaApp: App {
         .commands {
             CommandGroup(replacing: .newItem) { }
             CommandMenu("Device") {
-                Button("Scan for Download Mode Device") {
-                    model.scanForDevice()
+                Button(model.selectedSection == .unlock ? "Inspect Unlock Eligibility" : "Scan for Download Mode Device") {
+                    if model.selectedSection == .unlock {
+                        model.scanUnlockDevice()
+                    } else {
+                        model.scanForDevice()
+                    }
                 }
                 .keyboardShortcut("r", modifiers: [.command])
 

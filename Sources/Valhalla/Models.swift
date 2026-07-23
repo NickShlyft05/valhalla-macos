@@ -3,6 +3,7 @@ import SwiftUI
 
 enum AppSection: String, CaseIterable, Identifiable {
     case flash = "Flash"
+    case unlock = "Bootloader"
     case device = "PIT & Device"
     case logs = "Session Log"
 
@@ -11,9 +12,162 @@ enum AppSection: String, CaseIterable, Identifiable {
     var icon: String {
         switch self {
         case .flash: return "bolt.fill"
+        case .unlock: return "lock.open.fill"
         case .device: return "square.stack.3d.up.fill"
         case .logs: return "text.alignleft"
         }
+    }
+}
+
+enum UnlockTransport: Equatable {
+    case unknown
+    case scanning
+    case disconnected
+    case unauthorized(String)
+    case adb(String)
+    case downloadMode
+    case fastboot(String)
+    case multipleDevices(Int)
+    case error(String)
+
+    var title: String {
+        switch self {
+        case .unknown: return "Not scanned"
+        case .scanning: return "Inspecting device…"
+        case .disconnected: return "No device"
+        case .unauthorized: return "USB authorization needed"
+        case .adb: return "Android connected"
+        case .downloadMode: return "Download Mode"
+        case .fastboot: return "Fastboot detected"
+        case .multipleDevices(let count): return "\(count) devices connected"
+        case .error: return "Inspection failed"
+        }
+    }
+
+    var isADBConnected: Bool {
+        if case .adb = self { return true }
+        return false
+    }
+}
+
+enum BootloaderEligibility: Equatable {
+    case noReport
+    case wrongManufacturer(String)
+    case alreadyUnlocked
+    case readyForDeviceConfirmation
+    case needsOEMToggle
+    case unsupported
+    case unknown
+
+    var title: String {
+        switch self {
+        case .noReport: return "Connect and inspect"
+        case .wrongManufacturer: return "Not a Samsung device"
+        case .alreadyUnlocked: return "Bootloader appears unlocked"
+        case .readyForDeviceConfirmation: return "Ready for Download Mode"
+        case .needsOEMToggle: return "OEM Unlock setup required"
+        case .unsupported: return "Official unlock unsupported"
+        case .unknown: return "Eligibility not reported"
+        }
+    }
+}
+
+struct BootloaderReport: Equatable {
+    let serial: String
+    let manufacturer: String
+    let model: String
+    let product: String
+    let device: String
+    let androidVersion: String
+    let buildNumber: String
+    let oemUnlockSupported: Bool?
+    let oemUnlockAllowed: Bool?
+    let flashLocked: Bool?
+    let vbmetaState: String
+    let verifiedBootState: String
+    let developerOptionsEnabled: Bool?
+
+    var eligibility: BootloaderEligibility {
+        if !manufacturer.isEmpty,
+           !manufacturer.localizedCaseInsensitiveContains("samsung") {
+            return .wrongManufacturer(manufacturer)
+        }
+        if flashLocked == false || vbmetaState.localizedCaseInsensitiveContains("unlocked") {
+            return .alreadyUnlocked
+        }
+        if oemUnlockSupported == false {
+            return .unsupported
+        }
+        if oemUnlockAllowed == true {
+            return .readyForDeviceConfirmation
+        }
+        if oemUnlockSupported == true {
+            return .needsOEMToggle
+        }
+        return .unknown
+    }
+
+    var displayName: String {
+        if !model.isEmpty { return model }
+        if !product.isEmpty { return product }
+        return "Samsung device"
+    }
+}
+
+struct ADBDeviceRecord: Equatable {
+    let serial: String
+    let state: String
+    let attributes: [String: String]
+}
+
+enum AndroidDeviceParser {
+    static func parseDevices(_ output: String) -> [ADBDeviceRecord] {
+        output
+            .split(whereSeparator: \.isNewline)
+            .compactMap { rawLine in
+                let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard
+                    !line.isEmpty,
+                    !line.hasPrefix("List of devices"),
+                    !line.hasPrefix("* daemon")
+                else {
+                    return nil
+                }
+
+                let fields = line.split(whereSeparator: \.isWhitespace).map(String.init)
+                guard fields.count >= 2 else { return nil }
+                var attributes: [String: String] = [:]
+                for field in fields.dropFirst(2) {
+                    guard let colon = field.firstIndex(of: ":") else { continue }
+                    let key = String(field[..<colon])
+                    let value = String(field[field.index(after: colon)...])
+                    attributes[key] = value
+                }
+                return ADBDeviceRecord(
+                    serial: fields[0],
+                    state: fields[1],
+                    attributes: attributes
+                )
+            }
+    }
+
+    static func parseProperties(_ output: String) -> [String: String] {
+        var properties: [String: String] = [:]
+        let pattern = #"^\[([^\]]+)\]: \[(.*)\]$"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return properties }
+
+        for line in output.split(whereSeparator: \.isNewline).map(String.init) {
+            let range = NSRange(line.startIndex..<line.endIndex, in: line)
+            guard
+                let match = regex.firstMatch(in: line, range: range),
+                let keyRange = Range(match.range(at: 1), in: line),
+                let valueRange = Range(match.range(at: 2), in: line)
+            else {
+                continue
+            }
+            properties[String(line[keyRange])] = String(line[valueRange])
+        }
+        return properties
     }
 }
 

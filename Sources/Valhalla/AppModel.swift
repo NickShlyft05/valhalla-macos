@@ -17,8 +17,19 @@ final class AppModel: ObservableObject {
     @Published var confirmationPhrase = ""
     @Published var currentPlan: FlashPlan?
     @Published var alertMessage: String?
+    @Published var unlockTransport: UnlockTransport = .unknown
+    @Published var unlockReport: BootloaderReport?
+    @Published var showUnlockConfirmation = false
+    @Published var unlockConfirmationPhrase = ""
+    @Published var unlockOwnsDevice = false
+    @Published var unlockBackupConfirmed = false
+    @Published var unlockKnoxConfirmed = false
+    @Published var unlockFRPConfirmed = false
+    @Published var unlockStatusDetail = "Connect an unlocked Android session over USB to begin."
 
     let heimdallURL = BackendLocator.heimdall
+    let adbURL = AndroidTooling.adb
+    let fastbootURL = AndroidTooling.fastboot
     private var downloadedPITURL: URL?
     private var devicePartitions: [PITPartition] = []
     private var sessionNeedsResume = false

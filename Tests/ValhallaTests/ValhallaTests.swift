@@ -92,4 +92,92 @@ struct ValhallaTests {
         let result = TarMD5Verifier.verifySynchronously(url)
         #expect(result == .mismatch)
     }
+
+    @Test("ADB device parser keeps authorization state and attributes")
+    func adbDeviceParserReadsConnectedDevice() {
+        let output = """
+        List of devices attached
+        R5CT123456X device product:dm3qxxx model:SM_S918B device:dm3q transport_id:4
+        """
+
+        let devices = AndroidDeviceParser.parseDevices(output)
+        #expect(devices.count == 1)
+        #expect(devices[0].serial == "R5CT123456X")
+        #expect(devices[0].state == "device")
+        #expect(devices[0].attributes["product"] == "dm3qxxx")
+        #expect(devices[0].attributes["model"] == "SM_S918B")
+    }
+
+    @Test("ADB property parser reads Android getprop output")
+    func adbPropertyParserReadsGetprop() {
+        let output = """
+        [ro.product.manufacturer]: [samsung]
+        [ro.product.model]: [SM-S918B]
+        [ro.oem_unlock_supported]: [1]
+        [ro.boot.flash.locked]: [1]
+        """
+
+        let properties = AndroidDeviceParser.parseProperties(output)
+        #expect(properties["ro.product.manufacturer"] == "samsung")
+        #expect(properties["ro.product.model"] == "SM-S918B")
+        #expect(properties["ro.oem_unlock_supported"] == "1")
+    }
+
+    @Test("Unlock eligibility distinguishes ready and unsupported devices")
+    func unlockEligibilityUsesReportedBootState() {
+        let ready = BootloaderReport(
+            serial: "serial",
+            manufacturer: "samsung",
+            model: "SM-S918B",
+            product: "dm3q",
+            device: "dm3q",
+            androidVersion: "16",
+            buildNumber: "build",
+            oemUnlockSupported: true,
+            oemUnlockAllowed: true,
+            flashLocked: true,
+            vbmetaState: "locked",
+            verifiedBootState: "green",
+            developerOptionsEnabled: true
+        )
+        let unsupported = BootloaderReport(
+            serial: "serial",
+            manufacturer: "samsung",
+            model: "SM-S938U",
+            product: "pa3q",
+            device: "pa3q",
+            androidVersion: "16",
+            buildNumber: "build",
+            oemUnlockSupported: false,
+            oemUnlockAllowed: false,
+            flashLocked: true,
+            vbmetaState: "locked",
+            verifiedBootState: "green",
+            developerOptionsEnabled: true
+        )
+
+        #expect(ready.eligibility == .readyForDeviceConfirmation)
+        #expect(unsupported.eligibility == .unsupported)
+    }
+
+    @Test("Already-unlocked boot state takes precedence")
+    func unlockedBootStateIsRecognized() {
+        let report = BootloaderReport(
+            serial: "serial",
+            manufacturer: "samsung",
+            model: "Galaxy",
+            product: "product",
+            device: "device",
+            androidVersion: "16",
+            buildNumber: "build",
+            oemUnlockSupported: nil,
+            oemUnlockAllowed: nil,
+            flashLocked: false,
+            vbmetaState: "unlocked",
+            verifiedBootState: "orange",
+            developerOptionsEnabled: true
+        )
+
+        #expect(report.eligibility == .alreadyUnlocked)
+    }
 }

@@ -83,6 +83,31 @@ enum BackendLocator {
     }
 }
 
+enum AndroidTooling {
+    private static var platformToolsDirectory: URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Android/sdk/platform-tools", isDirectory: true)
+    }
+
+    static var adb: URL? {
+        locate("adb")
+    }
+
+    static var fastboot: URL? {
+        locate("fastboot")
+    }
+
+    private static func locate(_ name: String) -> URL? {
+        [
+            URL(fileURLWithPath: "/opt/homebrew/bin/\(name)"),
+            URL(fileURLWithPath: "/usr/local/bin/\(name)"),
+            platformToolsDirectory.appendingPathComponent(name),
+            URL(fileURLWithPath: "/usr/bin/\(name)")
+        ]
+        .first { FileManager.default.isExecutableFile(atPath: $0.path) }
+    }
+}
+
 struct InspectionResult {
     let entries: [String]
     let detail: String
